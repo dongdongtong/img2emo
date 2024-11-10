@@ -76,9 +76,19 @@ bash scripts/img2emo/va_giantvit_lora.sh 1 32 EMOTIC NAPS_H OASIS Emotion6
 ```
 
 
+## Inference trained model on your custom dataset
+
+To perform inference on your custom dataset, please refer to the file `inference.py`.
+We provide an API in `inferencer.py`, you can use it to perform inference on your custom dataset.
+
+
 
 ## Acknowledgements
 
 This project is inspired by and builds upon various existing works in the field of emotion recognition and model scaling.
 
 For more details, refer to the individual script files and their documentation.
+
+## Notes
+
+If you have any problems, please contact me.
