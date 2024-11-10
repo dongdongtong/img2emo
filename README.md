@@ -1,31 +1,84 @@
-# AnyProject
+# Img2Emo Project
 
-AnyProject is a prototype project for medical image analysis, allowing you to build highly custom project quickly based on it.
+The Img2Emo project is designed to train and evaluate models for valence and arousal estimation from images. This guide will help you understand how to use the provided scripts to train and evaluate models using different datasets and configurations.
 
-This project allows for custom transforms for medical image using MONAI. Check the example data/transforms.
+## Prerequisites
 
-For now, it cannot support multi-gpu distributed parallel training.
+Ensure you have the necessary environment set up to run the scripts, including any dependencies and datasets required for the project.
+Requirements:
 
-It has contained an segmentation example.
+- Python 3.10
+- Pytorch >= 2.0
 
-## Add Custom Dataset
-You need to define the structure of your dataset, read the available data from your original directory.
-Some steps:
+## Running the Scripts
 
-* create a dataset.py like `data/datasets/hematoma.py` to define the available data, including images, labels, segmentations.
-* Use the `DATASET_REGISTRY` to register it.
-* Define a dataset wrapper to help load the data like `HematomaSegWrapper` in `data/datasets/hematoma.py`.
-* Use the custom dataset name and dataset wrapper name in the newly-created `configs/datasets/*.yml`.
+#### Train Simple Baseline Model
 
-## Add Custom Transforms
-Just follow the same steps as `Add Custom Dataset`. 
-But now, you need to create the custom transforms in the `data/transforms` like `data/transforms/hematoma_seg_augs.py`.
+To train a simple baseline model, you can use the following commands. Uncomment the desired line in the `run.sh` script to execute:
 
-## Add Custom trainer
-Refer to `trainers/segmentation/hematoma_seg.py`.
+#### Train with EMOTIC dataset
 
-## Run the code.
-For example, run `bash scripts/hematoma_seg/run.sh`.
+```
+bash scripts/img2emo/va_random_sampler.sh 1 EMOTIC
+```
 
-# Acknowledgement
-This project is heavily copied from [dassl](https://github.com/KaiyangZhou/Dassl.pytorch).
+#### Train with EMOTIC and NAPS_H datasets
+
+```
+bash scripts/img2emo/va_random_sampler.sh 1 EMOTIC NAPS_H
+```
+
+#### Train with EMOTIC, NAPS_H, and OASIS datasets
+
+```
+bash scripts/img2emo/va_random_sampler.sh 1 EMOTIC NAPS_H OASIS
+```
+
+
+### Evaluate Simple & Fair Baseline Model
+
+To evaluate the baseline model, use the following commands. Uncomment the desired line in the `run.sh` script to execute:
+
+#### Evaluate with EMOTIC dataset
+
+```
+bash scripts/img2emo/eval_va_fusion_dataset.sh 1 EMOTIC
+```
+
+#### Evaluate with EMOTIC and NAPS_H datasets
+
+```
+bash scripts/img2emo/eval_va_fusion_dataset.sh 1 EMOTIC NAPS_H
+```
+
+#### Evaluate with EMOTIC, NAPS_H, and OASIS datasets
+
+```
+bash scripts/img2emo/eval_va_fusion_dataset.sh 1 EMOTIC NAPS_H OASIS
+```
+
+
+### Scale up Maxvit_tiny to Giant Vit using LoRA
+
+To scale up the model using LoRA, use the following commands. Uncomment the desired line in the `run.sh` script to execute:
+
+
+#### Scale up with EMOTIC, NAPS_H, and OASIS datasets
+
+```
+bash scripts/img2emo/va_giantvit_lora.sh 1 32 EMOTIC NAPS_H OASIS
+```
+
+#### Scale up with EMOTIC, NAPS_H, OASIS, and Emotion6 datasets
+
+```
+bash scripts/img2emo/va_giantvit_lora.sh 1 32 EMOTIC NAPS_H OASIS Emotion6
+```
+
+
+
+## Acknowledgements
+
+This project is inspired by and builds upon various existing works in the field of emotion recognition and model scaling.
+
+For more details, refer to the individual script files and their documentation.
