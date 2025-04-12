@@ -259,7 +259,6 @@ class EmoticMaxVit(TrainerX):
 
     def model_backward_and_update(self, loss, names=None, grad_record=False, grad_clip=False, grad_tag="g"):
         names = self.get_model_names(names)
-        self.model_zero_grad(names)
         
         accumulate_steps = self.cfg.TRAIN.GRADIENT_ACCUMULATION_STEPS
 
@@ -284,7 +283,7 @@ class EmoticMaxVit(TrainerX):
         if self.batch_idx % self.cfg.TRAIN.PRINT_FREQ == 0 and grad_record:
             for name, param in self.model.named_parameters():
                 try:
-                    if param.requires_grad and name_grad_available(name, names):
+                    if param.requires_grad:
                         self._writer.add_scalar(f"grad_{grad_tag}/{name}", param.grad.norm(), global_step=self.epoch * self.num_batches)
                 except Exception as e:
                     print(f"Error in recording gradient: {e}, name: {name}")
@@ -294,11 +293,13 @@ class EmoticMaxVit(TrainerX):
                 for name in names:
                     if self._optims[name] is not None:
                         self.scaler.step(self._optims[name])
+                        self._optims[name].zero_grad()
                 self.scaler.update()
             else:
                 for name in names:
                     if self._optims[name] is not None:
                         self._optims[name].step()
+                        self._optims[name].zero_grad()
 
     def load_model(self, directory, epoch=None):
         if not directory:
