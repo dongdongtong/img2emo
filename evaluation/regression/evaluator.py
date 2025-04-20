@@ -3,6 +3,7 @@ import os.path as osp
 from collections import OrderedDict, defaultdict
 import torch
 from sklearn.metrics import f1_score, confusion_matrix
+from scipy.stats import spearmanr
 
 from ..build import EVALUATOR_REGISTRY, EvaluatorBase
 
@@ -70,6 +71,10 @@ class Regression(EvaluatorBase):
         y_pred_tensor = torch.tensor(y_pred)
         ccc = np.mean([CCC(y_true_tensor[:, i], y_pred_tensor[:, i]).item() 
                        for i in range(y_true.shape[1])])
+        
+        # Calculate SRCC
+        srcc = np.mean([spearmanr(y_true[:, i], y_pred[:, i])[0]
+                       for i in range(y_true.shape[1])])
 
         # The first value will be returned by trainer.test()
         results["mae"] = mae
@@ -77,6 +82,7 @@ class Regression(EvaluatorBase):
         results["mse"] = mse
         results["correlation"] = corr
         results["ccc"] = ccc
+        results["srcc"] = srcc
 
         if self.cfg.TEST.PER_CLASS_RESULT:
             mae_metrics = []
@@ -84,6 +90,7 @@ class Regression(EvaluatorBase):
             rmse_metrics = []
             corr_metrics = []
             ccc_metrics = []
+            srcc_metrics = []
 
             for dim in range(y_true.shape[1]):
                 errors = y_pred[:, dim] - y_true[:, dim]
@@ -92,12 +99,14 @@ class Regression(EvaluatorBase):
                 rmse_dim = np.sqrt(mse_dim)
                 corr_dim = np.corrcoef(y_true[:, dim], y_pred[:, dim])[0,1]
                 ccc_dim = CCC(torch.tensor(y_true[:, dim]), torch.tensor(y_pred[:, dim])).item()
+                srcc_dim = spearmanr(y_true[:, dim], y_pred[:, dim])[0]
                 
                 mae_metrics.append(mae_dim)
                 mse_metrics.append(mse_dim)
                 rmse_metrics.append(rmse_dim)
                 corr_metrics.append(corr_dim)
                 ccc_metrics.append(ccc_dim)
+                srcc_metrics.append(srcc_dim)
                 
                 classname = self._lab2cname[dim] if self._lab2cname else f"dim_{dim}"
                 
@@ -107,6 +116,7 @@ class Regression(EvaluatorBase):
                 results[f"{classname}_mse"] = mse_dim
                 results[f"{classname}_correlation"] = corr_dim
                 results[f"{classname}_ccc"] = ccc_dim
+                results[f"{classname}_srcc"] = srcc_dim
         
         return results
 
@@ -114,11 +124,12 @@ class Regression(EvaluatorBase):
         print(
             "=> result\n"
             f"* total: {self._total:,}\n"
-            f"* MAE: {results['mae']:.2f}\n"
-            f"* RMSE: {results['rmse']:.2f}\n"
-            f"* MSE: {results['mse']:.2f}\n"
-            f"* PCC: {results['correlation']:.2f}\n"
-            f"* CCC: {results['ccc']:.2f}"
+            f"* MAE: {results['mae']:.4f}\n"
+            f"* RMSE: {results['rmse']:.4f}\n"
+            f"* MSE: {results['mse']:.4f}\n"
+            f"* PCC: {results['correlation']:.4f}\n"
+            f"* CCC: {results['ccc']:.4f}\n"
+            f"* SRCC: {results['srcc']:.4f}\n"
         )
         
         if self.cfg.TEST.PER_CLASS_RESULT:
@@ -128,11 +139,12 @@ class Regression(EvaluatorBase):
                 classname = self._lab2cname[dim] if self._lab2cname else f"dim_{dim}"
                 print(
                     f"* dimension: {dim} ({classname})\t"
-                    f"MAE: {results[f'{classname}_mae']:.2f}\t"
-                    f"RMSE: {results[f'{classname}_rmse']:.2f}\t"
-                    f"MSE: {results[f'{classname}_mse']:.2f}\t"
-                    f"PCC: {results[f'{classname}_correlation']:.2f}\t"
-                    f"CCC: {results[f'{classname}_ccc']:.2f}"
+                    f"MAE: {results[f'{classname}_mae']:.4f}\t"
+                    f"RMSE: {results[f'{classname}_rmse']:.4f}\t"
+                    f"MSE: {results[f'{classname}_mse']:.4f}\t"
+                    f"PCC: {results[f'{classname}_correlation']:.4f}\t"
+                    f"CCC: {results[f'{classname}_ccc']:.4f}\t"
+                    f"SRCC: {results[f'{classname}_srcc']:.4f}\n"
                 )
     
     def evaluate_average_on_domain(self):
@@ -161,6 +173,13 @@ class Regression(EvaluatorBase):
     def evaluate_average_on_instance(self):
         y_true = np.array(self._y_true)
         y_pred = np.array(self._y_pred)
+        
+        print(f"y_true shape: {y_true.shape}, y_pred shape: {y_pred.shape}")
+    
+        if y_pred.ndim == 1:
+            y_pred = y_pred.reshape(-1, 1)
+        if y_true.ndim == 1:
+            y_true = y_true.reshape(-1, 1)
         
         results = self._evaluate(y_true, y_pred)
 

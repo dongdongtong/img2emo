@@ -1,0 +1,44 @@
+# base config
+DESCRIPTION: Hematoma segmentation
+
+SEED: 42
+
+# Model
+MODEL:
+  NAME: vit_giant_lora
+
+# Optim
+OPTIM:
+  NAME: "sgd"
+  LR: 1e-3
+  WEIGHT_DECAY: 0.   # default is 5e-4
+  ADAM_EPS: 1e-8       # fp32/amp 1e-7, fp16 1e-3
+  MAX_EPOCH: 20
+  LR_SCHEDULER: "cosine"
+  WARMUP_EPOCH: 1
+  WARMUP_TYPE: "constant"
+  WARMUP_CONS_LR: 1e-5
+
+
+TRAIN:
+  PRINT_FREQ: 50
+  GRADIENT_ACCUMULATION_STEPS: 8
+
+TEST:
+  EVALUATOR: "Regression"
+  OTHER_METRICS: false
+  SPLIT: "val"
+  FINAL_MODEL: "best_val"   # last_step best_val
+  PER_CLASS_RESULT: true
+  AVG_ON_DOMAIN: false
+
+# Trainer
+TRAINER:
+  MEMCLIPVITLORA:
+    PREC: "amp"
+    METHOD: 2   # 1 for mse loss, 2 for mse + srcc loss
+
+    LORA_REDUCTION: 16
+    HEAD_DROPRATE: 0.
+
+    SRCC_TEMP: 0.1

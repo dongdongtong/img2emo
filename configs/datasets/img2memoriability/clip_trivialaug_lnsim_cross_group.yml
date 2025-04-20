@@ -1,0 +1,26 @@
+# Dataset
+DATASET:
+  NAME: LNSIMCG
+  ROOT: /opt/dingsd/img2emo/data
+  SOURCE_DOMAINS: ['LNSIM']
+  TARGET_DOMAINS: ['']
+  FOLD: 1
+
+
+DATASET_WRAPPER:
+  NAME: DatasetWrapper
+
+DATALOADER:
+  TRAIN_X:
+    BATCH_SIZE: 32
+    SAMPLER: RandomSampler
+  TEST:
+    BATCH_SIZE: 256
+  NUM_WORKERS: 16
+  
+
+INPUT:
+  SIZE: (224, 224)   # (w, h)
+  INTERPOLATION: "bicubic"
+  TRANSFORMS: clip_trivial_transform  # a function, emotic_transform
+

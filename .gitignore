@@ -1,2 +1,6 @@
 output
 **/__pycache__
+
+
+*.jpg
+*.nii*

@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 import os
+import os.path as osp
 from os.path import join, dirname, basename
 
 from copy import deepcopy
@@ -28,6 +29,8 @@ import loralib as lora
 
 from torchvision.models import maxvit_t
 from models.vit.lora_timm_vit import vit_giant_patch14_clip_224_lora
+
+from utils.scenes import scenes, template
 
 import loralib as lora
 
@@ -80,6 +83,85 @@ class VAModel(nn.Module):
         return {
             "va": x,
         }
+        
+
+import open_clip
+class CLIPModel(object):
+    def __init__(self, device):
+        model, _, preprocess = open_clip.create_model_and_transforms('ViT-g-14', pretrained='laion2b_s12b_b42k')
+        
+        print(f"Loading CLIP model and freezeing parameters")
+        # Freeze the model parameters
+        for param in model.parameters():
+            param.requires_grad = False
+        
+        scenes_text_feature_path = "/data/dingsd/img2emo/image_memoriability/datasets/scenes401_PlaceDataset.pt"
+        if osp.exists(scenes_text_feature_path):
+            print(f"Loading text features from {scenes_text_feature_path}")
+            scenes_text_features = torch.load(scenes_text_feature_path, weights_only=False, map_location="cpu")
+        else:
+            print("Calculating text features...")
+            tokenizer = open_clip.get_tokenizer('ViT-g-14')
+            scenes_texts = tokenizer([template + scene for scene in scenes])
+            scenes_text_features = model.encode_text(scenes_texts)  # shape (401, 1024)
+            torch.save(scenes_text_features, scenes_text_feature_path)
+            print(f"Text features saved to {scenes_text_feature_path}")
+        
+        self.visual = model.visual.to(device)
+        self.visual.eval()
+        self.scenes_text_features = scenes_text_features.to(device)
+
+    @torch.no_grad()
+    def forward(self, images):
+        image_features = self.visual(images)  # shape (bs, 1024)
+        text_features = self.scenes_text_features.clone()  # shape (401, 1024)
+        
+        # normalize
+        image_features /= image_features.norm(dim=-1, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        # print(f"Image features shape: {image_features.shape}, dtype: {image_features.dtype}")
+        # print(f"Text features shape: {text_features.shape}, dtype: {text_features.dtype}")
+        # calculate similarity
+        text_probs = (100.0 * image_features @ text_features.T).softmax(dim=-1)  # shape (bs, 401)
+        
+        return {
+            "image_features": image_features,
+            "text_features": text_features,
+            "scene_probs": text_probs,
+        }
+        
+
+class MemModel(nn.Module):
+    def __init__(self, device, lora_reduction: int, droprate: float = 0.):
+        super().__init__()
+        
+        model = vit_giant_patch14_clip_224_lora(pretrained=True, pretrained_strict=False, lora_reduction=lora_reduction)
+        model.head = None
+        
+        # Freeze base model parameters
+        lora.mark_only_lora_as_trainable(model, bias='all')
+        
+        num_features = model.num_features + 1024 + 401   # here 1024 means image features from clip, 401 means scene probas
+        self.class_head = nn.Sequential(
+                nn.Linear(num_features, 256),
+                nn.ReLU(),
+                nn.Dropout(droprate),
+                nn.Linear(256, 1)
+                )
+        
+        self.model = model
+        
+        self.clipmodel = CLIPModel(device)
+        self.device = device
+    
+    def forward(self, x):
+        features = self.model.forward_features(x)
+        clip_features = self.clipmodel.forward(x)
+        x = features[:, self.model.num_prefix_tokens:].mean(dim=1)
+        x = torch.cat((x, clip_features["image_features"], clip_features["scene_probs"]), dim=1)
+        x = self.class_head(x)
+        return x
+
 
 
 class VAPredictor:
@@ -121,6 +203,45 @@ class VAPredictor:
             "valence": v_float,
             "arousal": a_float,
         }
+        
+    
+class MemPredictor:
+    def __init__(
+        self, 
+        lora_reduction=8, 
+        model_path="output/clip_trivialaug_lamem/MemCLIPVitLora/clip_lamem_vit_lora_mse_srcc_ccc_ep20/LaMem/seed1_fold1/model/model-best.pth.tar",
+        droprate=0.,
+    ):
+        
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        self.model = MemModel(device, lora_reduction, droprate)
+        self.model_path = model_path
+
+        self.device = device
+        self.model = self.model.to(self.device)
+
+        self.model = load_pretrained_model_lora_classhead(self.model, torch.load(model_path))
+
+        self.model.eval()
+
+        self.test_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize([0.48145466, 0.4578275, 0.40821073], [0.26862954, 0.26130258, 0.27577711]),  # Notice this is the OpenAI's CLIP mean and std
+        ])
+    
+    @torch.inference_mode()
+    def __call__(self, input_image_path: str) -> dict:
+        image = Image.open(input_image_path).convert('RGB')
+
+        image_tensor = self.test_transform(image).unsqueeze(0).to(self.device)
+        
+        with torch.amp.autocast(device_type="cuda"):
+            image_memoriability = self.model(image_tensor)
+
+        return image_memoriability
 
 
 @torch.no_grad()
