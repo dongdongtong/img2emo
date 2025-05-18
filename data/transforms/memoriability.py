@@ -49,3 +49,17 @@ def clip_trivial_transform(cfg, is_train=True, only_other_transforms=False):
         ]
     
     return transforms.Compose(complex_transforms)
+
+
+
+@TRANSFORM_REGISTRY.register()
+def resmem_transforms(cfg, is_train=True, only_other_transforms=False):
+    
+    transformer = transforms.Compose((
+        transforms.Resize((256, 256)),
+        transforms.CenterCrop(227),
+        transforms.ToTensor()
+        )
+    )
+
+    return transformer

@@ -1,11 +1,18 @@
 #!/bin/bash
 
 
-bash scripts/img2mem/mem_giantvit_lora.sh 1 32 LaMem
-bash scripts/img2mem/mem_giantvit_lora_srccloss.sh 1 32 LaMem
+# bash scripts/img2mem/mem_giantvit_lora.sh 1 32 LaMem
+# bash scripts/img2mem/mem_giantvit_lora_srccloss.sh 1 32 LaMem
 
-bash scripts/img2mem/mem_giantvit_lora_srccloss_LNSIM.sh 1 32 LaMem
+# bash scripts/img2mem/mem_giantvit_lora_srccloss_LNSIM.sh 1 32 LaMem
 
+
+# Some inferences
+# this is using pretrained resmem model directly on LNSIM.
+# bash scripts/img2mem/inference_resmem.sh 1 32 LNSIM
+# this is using our finetuned CLIP model (first LaMem, then MemCat) directly on LNSIM.
+# bash scripts/img2mem/inference_finetuned_LaMem_MemCat_to_LNSIM.sh 1 32 LNSIM
+bash scripts/img2mem/inference_LaMem_ensembled_MemCat_LNSIM.sh 1 1 LNSIM
 # =============================================
 # === Train Simple Baseline Model ============
 # =============================================
